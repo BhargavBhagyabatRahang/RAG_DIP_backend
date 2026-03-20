@@ -215,6 +215,7 @@ class ChunkMarkdownView(APIView):
     def post(self, request):
         try:
             md_path = request.data.get("path")
+            use_contextual_retrieval = request.data.get("contextualize", True)
             # Allowing dynamic control of chunk size for different doc types
             max_chars = int(request.data.get("max_chars", 500))
             overlap = int(request.data.get("overlap", 50))
@@ -233,7 +234,7 @@ class ChunkMarkdownView(APIView):
                 markdown_text=markdown_text,
                 source_file=base_name,
                 max_chars=max_chars,
-                overlap=overlap
+                contextualize=use_contextual_retrieval
             )
 
             saved_files = save_chunks(chunks, base_name, chunk_dir)

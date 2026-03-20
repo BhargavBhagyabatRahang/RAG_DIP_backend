@@ -14,6 +14,10 @@ RUN apt-get install -y libgl1
 RUN apt-get install -y fonts-noto-cjk
 RUN apt-get install -y libglib2.0-0
 
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && update-ca-certificates
+    
 # Copying dependency list 
 COPY requirements.txt .
 
@@ -21,13 +25,14 @@ RUN pip install requests \
     --trusted-host pypi.org \
     --trusted-host files.pythonhosted.org
 
-RUN pip install --no-cache-dir torch==2.10.0 torchvision==0.25.0 \
+RUN pip install torch==2.10.0 torchvision==0.25.0 \
     --index-url https://download.pytorch.org/whl/cpu \
     --trusted-host download.pytorch.org \
+    --trusted-host download-r2.pytorch.org \
     --trusted-host pypi.org \
     --trusted-host files.pythonhosted.org
 
-RUN pip install --no-cache-dir -r requirements.txt \
+RUN pip install -r requirements.txt \
     --trusted-host pypi.org \
     --trusted-host files.pythonhosted.org
 
