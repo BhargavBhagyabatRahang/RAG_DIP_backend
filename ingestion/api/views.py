@@ -17,7 +17,6 @@ from ingestion.processors.pdf_converter import convert_to_pdf
 from ingestion.processors.pdf_to_md import pdf_to_markdown
 
 from ingestion.utils.file_router import get_upload_subdir
-from ingestion.vectorstore.qdrant_store import QdrantVectorStore
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -25,76 +24,6 @@ from rest_framework import status
 from ingestion.embeddings.embedder import embed_texts
 from ingestion.vectorstore.qdrant_store import QdrantVectorStore
 from ingestion.reranker.rerank import ONNXReranker
-
-class QueryView(APIView):
-
-    def post(self, request):
-        try:
-            query = request.data.get("query")
-
-            if not query:
-                return Response(
-                    {"error": "Query is required"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # 1) Embed Query
-            query_vector = embed_texts([query])[0]
-
-            # 2) Search Qdrant
-            store = QdrantVectorStore(collection_name="refinery_docs")
-
-            search_results = store.search(
-                vector=query_vector,
-                limit=10
-            )
-
-            if not search_results:
-                return Response(
-                    {"message": "No relevant documents found"},
-                    status=status.HTTP_200_OK
-                )
-
-            # Extract texts
-            documents = [
-                result.payload.get("text", "")
-                for result in search_results
-            ]
-
-            # 3️) Rerank
-            model_dir = os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "reranker"
-            )
-
-            reranker = ONNXReranker(model_dir=model_dir)
-
-            top_results = reranker.rerank(query, documents, top_k=3)
-
-            response_data = [
-                {
-                    "text": doc,
-                    "score": float(score)
-                }
-                for doc, score in top_results
-            ]
-
-            return Response(
-                {"results": response_data},
-                status=status.HTTP_200_OK
-            )
-
-        except Exception as e:
-            return Response(
-                {
-                    "error": "Query processing failed",
-                    "reason": str(e)
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
 
 class PdfToMarkdownView(APIView):
     
@@ -217,8 +146,8 @@ class ChunkMarkdownView(APIView):
             md_path = request.data.get("path")
             use_contextual_retrieval = request.data.get("contextualize", True)
             # Allowing dynamic control of chunk size for different doc types
-            max_chars = int(request.data.get("max_chars", 500))
-            overlap = int(request.data.get("overlap", 50))
+            max_chars = int(request.data.get("max_chars", 900))
+            overlap = int(request.data.get("overlap", 90))
 
             if not md_path or not os.path.exists(md_path):
                 return Response({"error": "Valid Markdown path required"}, status=status.HTTP_400_BAD_REQUEST)

@@ -1,56 +1,53 @@
-import subprocess
 from pathlib import Path
+import traceback
+
+from ingestion.processors.pdf_pipeline.orchestrator import process_pdf
 
 
-def pdf_to_markdown(pdf_path: str, base_output_dir: str) -> str:
+def pdf_to_markdown(pdf_path: str, base_output_dir: str = None, mode: str = "auto") -> str:
     """
-    Convert a PDF to Markdown using MinerU CLI.
-    MinerU generates files on disk; this function returns
-    the absolute path of the generated .md file.
+    Convert a PDF to Markdown using custom pipeline.
+
+    Output path (hardcoded):
+    <project_root>/data/markdown/<pdf_name>/<pdf_name>/hybrid_auto/<pdf_name>.md
     """
-
-    pdf_path = Path(pdf_path)
-
-    if not pdf_path.exists():
-        raise FileNotFoundError(f"PDF not found: {pdf_path}")
-
-    # Create per-document output directory
-    output_dir = Path(base_output_dir) / pdf_path.stem
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # MinerU CLI command
-    cmd = [
-        "mineru",
-        "--path", str(pdf_path),
-        "-o", str(output_dir)
-    ]
 
     try:
-        result = subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+        pdf_path = Path(pdf_path)
+
+        if not pdf_path.exists():
+            raise FileNotFoundError(f"PDF not found: {pdf_path}")
+
+        pdf_name = pdf_path.stem
+
+        # Resolve project root 
+        project_root = Path(__file__).resolve().parents[3]
+
+        # Build hardcoded directory structure
+        output_dir = (
+            project_root
+            / "data"
+            / "markdown"
+            / pdf_name
+            / pdf_name
+            / "hybrid_auto"
         )
 
-        # DEBUG (optional – keep for now)
-        print("===== MinerU STDOUT =====")
-        print(result.stdout)
-        print("===== MinerU STDERR =====")
-        print(result.stderr)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        # MinerU creates nested folders → search recursively
-        md_files = list(output_dir.rglob("*.md"))
-        if not md_files:
-            raise RuntimeError("MinerU did not generate a Markdown file")
+        #  Run pipeline
+        md_content = process_pdf(str(pdf_path), mode="auto")
 
-        # Return the first markdown file found
-        return str(md_files[0])
+        #  Final markdown file
+        md_file = output_dir / f"{pdf_name}.md"
+        md_file.write_text(md_content, encoding="utf-8")
 
-    except subprocess.CalledProcessError as e:
+        return str(md_file)
+
+    except Exception as e:
+        print("===== PDF PIPELINE ERROR =====")
+        traceback.print_exc()
+
         raise RuntimeError(
-            f"MinerU CLI failed\n"
-            f"STDOUT:\n{e.stdout}\n"
-            f"STDERR:\n{e.stderr}"
+            f"PDF to Markdown conversion failed\nReason: {str(e)}"
         )

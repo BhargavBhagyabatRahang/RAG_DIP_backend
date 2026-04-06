@@ -3,6 +3,17 @@ import requests
 import re
 
 # -------------------------------
+# 0) TABLE DETECTION
+# -------------------------------
+def is_table_block(text):
+    lines = [line.strip() for line in text.split("\n") if line.strip()]
+    if len(lines) < 2:
+        return False
+
+    pipe_lines = sum(1 for line in lines if "|" in line or "\t" in line)
+    return pipe_lines >= len(lines) * 0.6  
+
+# -------------------------------
 # 1) Section Splitter
 # -------------------------------
 def split_by_sections(markdown_text):
@@ -62,7 +73,7 @@ Context:"""
 
 
 # -------------------------------
-# 3) Main Chunker
+# 3) Main Chunker (UPDATED)
 # -------------------------------
 def chunk_markdown(markdown_text: str, source_file: str, max_chars: int = 800, contextualize: bool = True):
     sections = split_by_sections(markdown_text)
@@ -73,7 +84,6 @@ def chunk_markdown(markdown_text: str, source_file: str, max_chars: int = 800, c
         section_name = section["section"]
         text = section["text"]
 
-        # Splitting into atoms
         atoms = re.split(r'\n\s*\n', text)
 
         current_chunk_text = ""
@@ -84,21 +94,60 @@ def chunk_markdown(markdown_text: str, source_file: str, max_chars: int = 800, c
                 continue
 
             # -------------------------------
-            # Handling LARGE atoms
+            # TABLE HANDLING 
+            # -------------------------------
+            if is_table_block(atom):
+
+                # Flush existing chunk first
+                if current_chunk_text:
+                    chunk_objects.append(
+                        create_chunk_obj(
+                            current_chunk_text,
+                            section_name,
+                            source_file,
+                            global_idx,
+                            markdown_text,
+                            contextualize
+                        )
+                    )
+                    global_idx += 1
+                    current_chunk_text = ""
+
+                # Add table as atomic chunk
+                chunk_objects.append(
+                    create_chunk_obj(
+                        atom,
+                        section_name,
+                        source_file,
+                        global_idx,
+                        markdown_text,
+                        contextualize
+                    )
+                )
+                global_idx += 1
+                continue
+
+            # -------------------------------
+            # Handling LARGE atoms 
             # -------------------------------
             if len(atom) > max_chars:
-                sub_atoms = [
-                    atom[i:i + max_chars]
-                    for i in range(0, len(atom), max_chars)
-                ]
+                sentences = re.split(r'(?<=[.!?])\s+', atom)
+                sub_atoms = []
+                temp = ""
+
+                for sent in sentences:
+                    if len(temp) + len(sent) <= max_chars:
+                        temp += " " + sent
+                    else:
+                        sub_atoms.append(temp.strip())
+                        temp = sent
+                if temp:
+                    sub_atoms.append(temp.strip())
             else:
                 sub_atoms = [atom]
 
             for sub_atom in sub_atoms:
 
-                # -------------------------------
-                # Safe merging
-                # -------------------------------
                 if len(current_chunk_text) + len(sub_atom) > max_chars and current_chunk_text:
 
                     chunk_objects.append(
@@ -114,9 +163,6 @@ def chunk_markdown(markdown_text: str, source_file: str, max_chars: int = 800, c
 
                     global_idx += 1
 
-                    # -------------------------------
-                    # Smart overlapping
-                    # -------------------------------
                     overlap_text = current_chunk_text[-150:]
                     current_chunk_text = overlap_text + "\n\n" + sub_atom
 
@@ -126,7 +172,6 @@ def chunk_markdown(markdown_text: str, source_file: str, max_chars: int = 800, c
                     else:
                         current_chunk_text = sub_atom
 
-        # Final chunks in section
         if current_chunk_text:
             chunk_objects.append(
                 create_chunk_obj(
@@ -144,7 +189,7 @@ def chunk_markdown(markdown_text: str, source_file: str, max_chars: int = 800, c
 
 
 # -------------------------------
-# 4) Chunk Object Creator
+# 4) Chunk Object Creator 
 # -------------------------------
 def create_chunk_obj(raw_text, section_name, source_file, idx, full_doc, contextualize):
 
@@ -154,18 +199,13 @@ def create_chunk_obj(raw_text, section_name, source_file, idx, full_doc, context
         print(f"Contextualizing Chunk {idx}...")
         context = generate_contextual_explanation(full_doc, raw_text)
 
-        # -------------------------------
-        # Section-aware context
-        # -------------------------------
         final_content = f"CONTEXT: {section_name} - {context}\n\nCONTENT: {raw_text}"
 
     else:
         final_content = raw_text
 
-    # -------------------------------
     # Table hint
-    # -------------------------------
-    if "|" in raw_text:
+    if "|" in raw_text or "\t" in raw_text:
         context += " Contains tabular data."
 
     return {

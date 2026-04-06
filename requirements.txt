@@ -10,6 +10,7 @@ av==16.1.0
 beautifulsoup4==4.14.3
 boto3==1.42.37
 botocore==1.42.37
+camelot-py[cv]==0.11.0
 certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
@@ -53,6 +54,7 @@ joblib==1.5.3
 json_repair==0.55.1
 kiwisolver==1.4.9
 lazy_loader==0.4
+layoutparser[layoutmodels,tesseract]
 loguru==0.7.3
 magika==1.0.1
 MarkupSafe==3.0.3
@@ -73,6 +75,7 @@ pandas==3.0.0
 pdfminer.six==20260107
 pdftext==0.6.3
 pillow==12.1.0
+pix2tex==0.1.2
 polars==1.37.1
 polars-runtime-32==1.37.1
 portalocker==3.2.0
@@ -90,7 +93,8 @@ pypdfium2==4.30.0
 
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.1
-
+PyMuPDF==1.24.9
+pytesseract==0.3.13
 PyYAML==6.0.3
 qdrant-client==1.16.2
 qwen-vl-utils==0.0.14
