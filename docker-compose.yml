@@ -16,6 +16,7 @@ services:
     depends_on:
       - qdrant
       - gotenberg
+      - vllm
 
   dip-frontend:
     build: ./DIP_frontend
@@ -40,8 +41,7 @@ services:
       - HF_HUB_OFFLINE=1
     depends_on:
       - qdrant
-      - ollama
-      - ollama-warmup
+      - vllm
 
   ip-frontend:
 
@@ -67,35 +67,28 @@ services:
     ports:
       - "3000:3000"
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+
     ports:
-      - "11434:11434"
+      - "10000:10000"
     volumes:
-      - "./models/OLLAMA model:/root/.ollama"
-    deploy:
-      resources:
-        reservations: 
-          devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+      - ./models:/models
+  
+    shm_size: "10.24gb"
+
     environment:
-      - OLLAMA_FLASH_ATTENTION=1
-      - OLLAMA_NUM_GPU=-1
-      - OLLAMA_KEEP_ALIVE=-1
-    restart: unless-stopped
- 
-  ollama-warmup:
-    image: curlimages/curl:latest
-    container_name: ollama_warmup
-    depends_on: 
-      - ollama
+      - NVIDIA_VISIBLE_DEVICES=all
+
+    runtime: nvidia 
 
     command: >
-      sh -c "sleep 5 && curl -X POST http://ollama:11434/api/generate -d '{\"model\": \"Refinery_LLM\"}'"
-
-  
-
-
+      /models/NVIDIA-Nemotron-3-Nano-4B-BF16
+      --trust-remote-code
+      --port 10000
+      --gpu-memory-utilization 0.6
+      --max-model-len 4096    
+      --served-model-name Refinery_LLM:latest
+      --reasoning-parser nemotron_v3
+      --default-chat-template-kwargs '{"enable_thinking": false}'
