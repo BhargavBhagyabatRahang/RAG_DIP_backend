@@ -63,11 +63,20 @@ Context:"""
 
     try:
         response = requests.post(
-            "http://ollama:11434/api/generate",
-            json={"model": model_name, "prompt": prompt, "stream": False},
+            "http://vllm:10000/v1/chat/completions",
+             json={
+                "model": model_name,
+                "messages": [
+                    {"role": "system", "content": "You are a refinery engineering assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "top_p":0.9,
+                "max_token":4096
+            },
             timeout=60
         )
-        return response.json().get("response", "").strip()
+        return response.json()["choices"][0]["message"]["reasoning"].strip()
     except Exception:
         return "Refinery engineering content."
 
