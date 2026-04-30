@@ -1,0 +1,94 @@
+services:
+
+  dip-backend:
+    build: ./backend
+    container_name: dip_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+      - ./.cache:/root/.cache
+
+    environment:
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
+
+    depends_on:
+      - qdrant
+      - gotenberg
+      - vllm
+
+  dip-frontend:
+    build: ./DIP_frontend
+    container_name: dip_frontend
+    ports:
+      - "8003:8003"
+    depends_on:
+      - dip-backend
+
+  ip-backend:
+
+    build: ./IP_backend
+    container_name: ip_backend
+    ports:
+      - "8001:8001"
+
+    volumes:
+      - ./.cache:/root/.cache  
+
+    environment:
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
+    depends_on:
+      - qdrant
+      - vllm
+
+  ip-frontend:
+
+    build: ./IP_frontend
+    container_name: ip_frontend
+    ports:
+      - "8002:8002"
+
+    depends_on:
+      - ip-backend
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_db
+    ports:
+      - "6333:6333"
+    volumes:
+      - ./vector_store/qdrant:/qdrant/storage
+
+  gotenberg:
+    image: gotenberg/gotenberg:7
+    container_name: gotenberg
+    ports:
+      - "3000:3000"
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./models:/models
+  
+    shm_size: "10.24gb"
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+
+    runtime: nvidia 
+
+    command: >
+      /models/NVIDIA-Nemotron-3-Nano-4B-BF16
+      --trust-remote-code
+      --port 10000
+      --gpu-memory-utilization 0.6
+      --max-model-len 4096    
+      --served-model-name Refinery_LLM:latest
+      --reasoning-parser nemotron_v3
+      --default-chat-template-kwargs '{"enable_thinking": false}'
